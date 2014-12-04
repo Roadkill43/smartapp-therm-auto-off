@@ -1,0 +1,2 @@
+smartapp-therm-auto-off
+=======================
