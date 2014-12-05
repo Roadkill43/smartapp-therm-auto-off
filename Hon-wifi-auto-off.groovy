@@ -7,8 +7,8 @@
 definition(
     name: "Honeywell wifi Auto Off",
     namespace: "roadkill",
-    author: "mhall@martyrhall.com",
-    description: "Automatically turn off Honeywell thermostat when windows/doors open. Turn it back on when everything is closed up.",
+    author: "Roadkill43,
+    description: "Automatically turn off Honeywell thermostat when windows / doors are opened for a configurable period of time. Turn it back on when all the contacts have closed for a configurable period. ",
     category: "Green Living",
     iconUrl: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience.png",
     iconX2Url: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience%402x.png",
@@ -29,42 +29,39 @@ preferences {
 
 def installed() {
 	log.debug "Installed with settings: ${settings}"
-
-	initialize()
+        initialize()
 }
 
 def updated() {
 	log.debug "Updated with settings: ${settings}"
 
 	unsubscribe()
-    unschedule()
+        unschedule()
 	initialize()
 }
 
 def initialize() {
 	state.changed = false
-    
-    subscribe(sensors, 'contact', "sensorChange")
+        subscribe(sensors, 'contact', "sensorChange")
 }
 
 def sensorChange(evt) {
-	log.debug "Desc: $evt.value , $state"
-    if(evt.value == 'open' && !state.changed) {
-    	log.debug "Scheduling turn off ($delay minutes)"
-        if(state.scheduledRestore) {
+   log.debug "Desc: $evt.value , $state"
+   if(evt.value == 'open' && !state.changed) {
+          log.debug "Scheduling turn off ($delay minutes)"
+          if(state.scheduledRestore) {   // unscheduled a restore if there is one 
              state.scheduledRestore = false
              unschedule("restore")
-       }
-       if (delay < 1) {
-          turnOff()  
-       } else {
-          state.scheduled = true
-          runIn(delay * 60, turnOff)
-       }
-       
+          }
+          if (delay < 1) {
+             turnOff()  
+          } else {
+             state.scheduled = true
+             runIn(delay * 60, turnOff)
+          }     
     } else if(evt.value == 'closed' && (state.changed || state.scheduled)) {        
         if(!isOpen()) {
-          log.debug "Everything is closed, restoring thermostat ($delayRestore minutes)"
+          log.info "Everything is closed, restoring thermostat ($delayRestore minutes)"
           log.debug "state: $state"
           if(state.scheduled)  {
               state.scheduled = false
@@ -73,34 +70,36 @@ def sensorChange(evt) {
               restore()
            } else {
               state.scheduledRestore = true
-	   		  runIn(delayRestore * 60, restore)
+	      runIn(delayRestore * 60, restore)
            }
-        } else {
-        	log.debug "Something is still open."
-        }
+         } else {
+           log.debug "Something is still open."
+           // one or more things are still open.  
+         }
     }
 }
 
 def isOpen() {
 	def result = sensors.find() { it.currentValue('contact') == 'open'; }
-    log.debug "isOpen results: $result"
+       // log.debug "isOpen results: $result"
     
-    return result
+        return result
 }
 
 // turn off thermostat based on a contact being opened
 def turnOff() {
 	log.debug "Preparing to turn off thermostat due to contact open"
     if(isOpen()) {
-    	log.debug "It's safe. Turning it off."
-        thermostat.poll() //update mode to make sure we have the latest 
-	    state.thermostatMode = thermostat.currentValue("thermostatMode")
+    	log.debug "It's safe. Turning thermostat off."
+        thermostat.poll().    //update mode to make sure we have the latest 
+	state.thermostatMode = thermostat.currentValue("thermostatMode")
         state.changed = true
     	thermostat.off()
         state.scheduled = false
     	log.debug "State: $state"
     } else {
-    	log.debug "Just kidding. The platform did something bad."
+        // this should not happen. A turn off should not be ran/scheduled when all contacts are closed
+    	log.debug "Shouldn't happen. Scheduled off but everything is closed. The platform did something bad."
     }
 }
 
@@ -112,7 +111,8 @@ def restore() {
     state.changed = false
     state.thermostatMode = ""
     state.scheduledRestore = false
-    } else {
+  } else {
+    // this should not happen. A restore should not occur when there is an open contact. 
         log.debug "A door must have been reopened"
-    }
+  }
 }
